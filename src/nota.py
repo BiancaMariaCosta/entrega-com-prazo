@@ -28,10 +28,12 @@ class ResultadoNota:
     situacao: str  # "DENTRO_DO_PRAZO", "ATRASADA" ou "REJEITADA"
 
 
-def _validar_nota(nota) -> None:
+def _validar_nota(nota: int | float | Decimal) -> None:
     if isinstance(nota, bool) or not isinstance(nota, (int, float, Decimal)):
         raise ValueError("nota deve ser um número (int ou float), não booleano")
-    if not math.isfinite(float(nota)):
+    if isinstance(nota, float) and not math.isfinite(nota):
+        raise ValueError("nota não pode ser NaN nem infinito")
+    if isinstance(nota, Decimal) and not nota.is_finite():
         raise ValueError("nota não pode ser NaN nem infinito")
     if not NOTA_MINIMA <= nota <= NOTA_MAXIMA:
         raise ValueError(f"nota deve estar entre {NOTA_MINIMA} e {NOTA_MAXIMA}")
@@ -41,14 +43,14 @@ def _validar_datas(*datas) -> None:
     for d in datas:
         if not isinstance(d, datetime):
             raise ValueError("prazo, entrega e novo_prazo devem ser datetime")
-    com_fuso = {d.tzinfo is not None for d in datas}
+    com_fuso = {d.utcoffset() is not None for d in datas}
     if len(com_fuso) > 1:
         raise ValueError("as datas devem ser todas com fuso horário ou todas sem")
 
 
 def _tempo_decorrido(inicio: datetime, fim: datetime) -> timedelta:
     """Tempo real entre dois instantes; com fuso, compara em UTC (86.400 s por dia)."""
-    if inicio.tzinfo is not None:
+    if inicio.utcoffset() is not None:
         inicio = inicio.astimezone(timezone.utc)
         fim = fim.astimezone(timezone.utc)
     return fim - inicio
@@ -63,7 +65,7 @@ def _dias_iniciados(atraso: timedelta) -> int:
 
 
 def calcular_nota_final(
-    nota,
+    nota: int | float | Decimal,
     prazo: datetime,
     entrega: datetime,
     justificativa_aprovada: bool = False,
